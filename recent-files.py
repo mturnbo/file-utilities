@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import sys
 import time
@@ -58,28 +59,58 @@ def print_table(files):
     # Format data
     formatted_rows = []
     for file_path, atime in files:
-        formatted_time = datetime.fromtimestamp(atime).strftime("%Y-%m-%d %H:%M:%S")
         file_name = os.path.basename(file_path)
-        formatted_rows.append((file_name, formatted_time))
+        file_size = os.stat(file_path).st_size
+        formatted_time = datetime.fromtimestamp(atime).strftime("%Y-%m-%d %H:%M:%S")
+        formatted_rows.append((file_name, file_size, formatted_time))
 
     # Determine column widths
-    file_col_width = max(len("File Name"), *(len(row[0]) for row in formatted_rows)) if formatted_rows else len("File Name")
+    file_name_col_width = max(len("File Name"), *(len(row[0]) for row in formatted_rows)) if formatted_rows else len("File Name")
+    file_size_col_width = 15
     time_col_width = 20
 
+    hr = f"{'-' * file_name_col_width}-+-{'-' * file_size_col_width}-+-{'-' * time_col_width}"
+
     # Header
-    print(f"{'File Name'.ljust(file_col_width)} | {'Last Accessed'}")
-    print(f"{'-' * file_col_width}-+-{'-' * time_col_width}")
+    print(f"{'File Name'.ljust(file_name_col_width)} | {'File Size'.rjust(file_size_col_width)} | {'Last Accessed'}")
+    print(hr)
 
     # Rows
-    for file_name, access_time in formatted_rows:
-        print(f"{file_name.ljust(file_col_width)} | {access_time}")
+    for file_name, file_size, access_time in formatted_rows:
+        formatted_file_size = f"{file_size:,}"
+        print(f"{file_name.ljust(file_name_col_width)} | {formatted_file_size.rjust(file_size_col_width)} | {access_time}")
 
+    print(hr)
     print(f"\nTotal: {len(files)} files found.")
 
 
-if __name__ == '__main__':
-    target_directory = sys.argv[1]
-    days = int(sys.argv[2])
-    print(f"Scanning files in the directory: {target_directory} accessed in the past {days} day(s)\n")
-    results = find_recently_accessed_files(target_directory, days)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Find files accessed within the past N days."
+    )
+    parser.add_argument(
+        "directory",
+        help="Directory to search",
+    )
+    parser.add_argument(
+        "days",
+        type=int,
+        help="Number of days to look back",
+    )
+
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    if not os.path.isdir(args.directory):
+        print(f"Error: '{args.directory}' is not a valid directory.", file=sys.stderr)
+        return 1
+    print(f"Scanning files in the directory: {args.directory} accessed in the past {args.days} day(s)\n")
+    results = find_recently_accessed_files(args.directory, args.days)
     print_table(results)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
